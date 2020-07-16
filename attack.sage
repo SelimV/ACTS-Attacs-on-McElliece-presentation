@@ -8,6 +8,8 @@ set_random_seed(0)
 random.seed(0)
 loc = '~/Documents/ACTS/Project/attack.sage' 
 
+print('--- Random selection attack against McEliece cryptosystem ---')
+
 m = 10
 q = 2^m
 n = 2^(m-1) 
@@ -19,7 +21,7 @@ g = R.irreducible_element(t)
 C = codes.GoppaCode(g,L)
 G = C.generator_matrix()
 k = C.dimension()
-print(C)
+print('Encoding: ' + str(C))
 
 S = random_matrix(GF(2), k, k)
 while S.is_singular():
@@ -29,16 +31,20 @@ SG = SymmetricGroup(n)
 P = matrix(GF(2), Permutation(SG.random_element()).to_matrix())
 M = S*G*P
 
-message = random_vector(GF(2), k)
+m_bin = random_vector(GF(2), k)
+print('Message to be encoded: ' + str(m_bin))
 
 # Encode the message
 Chan = channels.StaticErrorRateChannel(C.ambient_space(), t)
-c = Chan(message*M)
+c = Chan(m_bin*M)
+
+print()
 
 # Attack! (Not really smart)
 indices = range(n)
 Mt = M.transpose()
 counter0 = 1
+print('Starting the basic attack...')
 start = time.time()
 
 while True:
@@ -59,13 +65,21 @@ while True:
     if counter0 % 500 == 0: print(counter0)
 
 time_taken0 = time.time() - start
-print(counter0)
-print(time_taken0)
+if mg == m_bin:
+    print('Attack successful!')
+    print('Number of iterations for the basic attack: ' + str(counter0))
+    print('Time taken for the basic attack: ' + str(time_taken0) + ' seconds')
+else:
+    print('Something went wrong!')
+
+
+print()
 
 # Attack! (Smart)
 indices = range(n)
 Mt = M.transpose()
 counter_smart = 1
+print('Starting the generalized attack (j = 2)...')
 start = time.time()
 succeed = True
 
@@ -85,36 +99,43 @@ while succeed:
     check0 = c + ck * MM
     if check0.hamming_weight() <= t:
         mg = ck * Mk_inv
-        print('Check 0')
         succeed = False
         break
 
     # Weight 1 pattern
-    for i in range(k):
+    i = 0
+    while i < k and succeed:
         check1 = check0 + MM[i]
 
         if check1.hamming_weight() <= t:
+            ck[i] += 1
             mg = ck * Mk_inv
-            mg[i] += 1
-            print('Check 1')
             succeed = False
             break
 
         # Weight 2 pattern
-        for j in range(i+1,k):
+        j = i+1
+        while j < k and succeed:
             check2 = check1 + MM[j]
 
             if check2.hamming_weight() <= t:
+                ck[i] += 1
+                ck[j] += 1
                 mg = ck * Mk_inv
-                mg[i] += 1
-                mg[j] += 1
-                print('Check 2')
                 succeed = False
                 break
+
+            j += 1
+
+        i += 1
 
     counter_smart += 1
     if counter_smart % 500 == 0: print(counter_smart)
 
 time_taken_smart = time.time() - start
-print(counter_smart)
-print(time_taken_smart)
+if mg == m_bin:
+    print('Attack successful!')
+    print('Number of iterations for the basic attack: ' + str(counter_smart))
+    print('Time taken for the basic attack: ' + str(time_taken_smart) + ' seconds')
+else:
+    print('Something went wrong!')
